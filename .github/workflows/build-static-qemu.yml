@@ -8,11 +8,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 清理旧源码
       - name: Clean qemu folder
         run: rm -rf qemu
 
-      # 拉官方 v4.2.1
       - name: Checkout QEMU v4.2.1
         uses: actions/checkout@v4
         with:
@@ -20,8 +18,7 @@ jobs:
           ref: v4.2.1
           path: qemu
 
-      # 安装交叉编译依赖
-      - name: Install dependencies
+      - name: Install cross-compile deps
         run: |
           sudo apt update
           sudo apt install -y \
@@ -30,18 +27,20 @@ jobs:
             autoconf \
             libtool \
             pkg-config \
-            libglib2.0-dev \
-            libpixman-1-dev
+            pkg-config-aarch64-linux-gnu \
+            libglib2.0-dev:arm64 \
+            libpixman-1-dev:arm64
 
-      # 配置交叉静态编译（跳过 Meson）
       - name: Configure QEMU
         run: |
           cd qemu
-          export PKG_CONFIG=pkg-config
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export PKG_CONFIG=pkg-config-aarch64-linux-gnu
+          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
           ./configure \
             --host=aarch64-linux-gnu \
             --target-list=aarch64-softmmu \
-            --cross-prefix=aarch64-linux-gnu- \
+            --cross-prefix=${CROSS_COMPILE} \
             --static \
             --disable-vnc \
             --disable-gtk \
@@ -52,14 +51,12 @@ jobs:
             --disable-docs \
             --disable-strip
 
-      # 编译并拷贝可执行文件
       - name: Build QEMU
         run: |
           cd qemu
           make -j$(nproc)
           cp aarch64-softmmu/qemu-system-aarch64 $GITHUB_WORKSPACE/
 
-      # 上传产物
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
