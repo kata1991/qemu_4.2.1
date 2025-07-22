@@ -8,9 +8,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. 清理旧源码
       - name: Clean qemu folder
         run: rm -rf qemu
 
+      # 2. 拉官方 v4.2.1 源码
       - name: Checkout QEMU v4.2.1
         uses: actions/checkout@v4
         with:
@@ -18,6 +20,7 @@ jobs:
           ref: v4.2.1
           path: qemu
 
+      # 3. 安装交叉编译 + ARM64 glib2.0 开发包
       - name: Install cross-compile deps
         run: |
           sudo apt update
@@ -31,12 +34,16 @@ jobs:
             libglib2.0-dev:arm64 \
             libpixman-1-dev:arm64
 
+      # 4. 配置交叉静态编译
       - name: Configure QEMU
         run: |
           cd qemu
+          # 指定交叉前缀
           export CROSS_COMPILE=aarch64-linux-gnu-
+          # 使用交叉 pkg-config 并指向 ARM64 .pc 路径
           export PKG_CONFIG=pkg-config-aarch64-linux-gnu
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
+
           ./configure \
             --host=aarch64-linux-gnu \
             --target-list=aarch64-softmmu \
@@ -51,12 +58,14 @@ jobs:
             --disable-docs \
             --disable-strip
 
+      # 5. 编译并拷贝 qemu-system-aarch64
       - name: Build QEMU
         run: |
           cd qemu
           make -j$(nproc)
           cp aarch64-softmmu/qemu-system-aarch64 $GITHUB_WORKSPACE/
 
+      # 6. 上传产物
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
