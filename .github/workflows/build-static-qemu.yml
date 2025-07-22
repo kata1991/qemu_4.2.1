@@ -1,4 +1,5 @@
-name: Build QEMU 4.2.1 aarch64 Static
+# .github/workflows/build-static-qemu.yml
+name: Build QEMU 4.2.1 Static for AArch64
 
 on:
   workflow_dispatch:
@@ -8,44 +9,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 清理旧文件
       - name: Clean workspace
-        run: |
-          rm -rf qemu-4.2.1 qemu-4.2.1.tar.xz qemu-system-aarch64
+        run: rm -rf qemu-4.2.1 qemu-4.2.1.tar.xz qemu-system-aarch64
 
-      # 2. 下载并解压 QEMU 4.2.1 官方源码
       - name: Download QEMU 4.2.1
         run: |
           wget https://download.qemu.org/qemu-4.2.1.tar.xz
           tar xJf qemu-4.2.1.tar.xz
 
-      # 3. 安装交叉编译和 ARM64 头文件
-      - name: Install cross‐build dependencies
+      - name: Install cross‐build deps
         run: |
           sudo apt update
           sudo apt install -y \
             gcc-aarch64-linux-gnu \
+            pkg-config-aarch64-linux-gnu \
+            libc6-dev:arm64 \
+            libglib2.0-dev:arm64 \
+            libpixman-1-dev:arm64 \
             make \
             autoconf \
-            libtool \
-            pkg-config \
-            libglib2.0-dev:arm64 \
-            libpixman-1-dev:arm64
+            libtool
 
-      # 4. 调试：查看 PKG_CONFIG_LIBDIR 及其内容
-      - name: Debug PKG_CONFIG_LIBDIR
+      - name: Debug pkg-config dirs
         run: |
-          export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          echo "PKG_CONFIG_LIBDIR is set to: $PKG_CONFIG_LIBDIR"
-          ls -1 $PKG_CONFIG_LIBDIR
+          echo "Native pkg-config   : $(which pkg-config)"
+          echo "Cross pkg-config    : $(which aarch64-linux-gnu-pkg-config)"
+          echo "Multiarch pc files  :"
+          ls -1 /usr/lib/aarch64-linux-gnu/pkgconfig
 
-      # 5. 配置并编译（走 autotools）
       - name: Configure & build QEMU
         run: |
           cd qemu-4.2.1
+
           export CROSS_COMPILE=aarch64-linux-gnu-
+          export PKG_CONFIG=aarch64-linux-gnu-pkg-config
           export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig
-          export PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
 
           ./configure \
             --host=aarch64-linux-gnu \
@@ -64,7 +62,6 @@ jobs:
           make -j$(nproc)
           cp aarch64-softmmu/qemu-system-aarch64 $GITHUB_WORKSPACE/
 
-      # 6. 上传产物
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
